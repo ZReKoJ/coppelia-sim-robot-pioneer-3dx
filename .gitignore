@@ -1,3 +1,9 @@
+
+muia-2020.ttt
+simConst.py
+sim.py
+remoteApi.so
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
