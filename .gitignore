@@ -1,7 +1,10 @@
 
 muia-2020.ttt
 simConst.py
+simConst.pyc
 sim.py
+sim.pyc
+remoteApi.dll
 remoteApi.so
 
 # Byte-compiled / optimized / DLL files

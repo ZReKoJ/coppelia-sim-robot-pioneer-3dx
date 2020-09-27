@@ -81,6 +81,7 @@ def getSonar(clientID, hRobot):
 def getImageBlob(clientID, hRobot):
     rc,ds,pk = sim.simxReadVisionSensor(clientID, hRobot[2],
                                          sim.simx_opmode_buffer)
+                                         
     blobs = 0
     coord = []
     if rc == sim.simx_return_ok and pk[1][0]:
@@ -95,16 +96,25 @@ def getImageBlob(clientID, hRobot):
 # --------------------------------------------------------------------------
 
 def avoid(sonar):
-    if (sonar[3] < 0.1) or (sonar[4] < 0.1):
-        lspeed, rspeed = +0.3, -0.5
-    elif sonar[1] < 0.3:
-        lspeed, rspeed = +1.0, +0.3
-    elif sonar[5] < 0.2:
-        lspeed, rspeed = +0.2, +0.7
+    if (sonar[3] < 0.3) or (sonar[4] < 0.3):
+        return -0.3, +1
+    elif (sonar[6] <  0.3) or (sonar[7] <  0.3):
+        return +1.8, -0.5
+    elif (sonar[3] < 0.6) or (sonar[4] < 0.6):
+        return -0.3, +1
+    elif (sonar[6] <  0.6) or (sonar[7] <  0.6):
+        return +1.8, -0.5
     else:
-        lspeed, rspeed = +2.0, +2.0
+        return +2.0, +2.0
+# --------------------------------------------------------------------------
 
-    return lspeed, rspeed
+def track(blobs, coord, lspeed, rspeed):
+    if (blobs == 1) and ((coord[0] > 0.95) or (coord[1] > 0.95)):
+        return +1.0, +1.0
+    elif (blobs == 1) and ((coord[0] > 0.75) or (coord[1] > 0.75)):
+        return +2.0, +2.0
+    else:
+        return lspeed, rspeed
 
 # --------------------------------------------------------------------------
 
@@ -129,17 +139,18 @@ def main():
         while sim.simxGetConnectionId(clientID) != -1:
             # Perception
             sonar = getSonar(clientID, hRobot)
-            # print '### s', sonar
+            '### s', sonar
 
             blobs, coord = getImageBlob(clientID, hRobot)
             print('###  ', blobs, coord)
 
             # Planning
             lspeed, rspeed = avoid(sonar)
+            lspeed, rspeed = track(blobs, coord, lspeed, rspeed)
 
             # Action
             setSpeed(clientID, hRobot, lspeed, rspeed)
-            time.sleep(0.1)
+            time.sleep(0.01)
 
         print('### Finishing...')
         sim.simxFinish(clientID)
