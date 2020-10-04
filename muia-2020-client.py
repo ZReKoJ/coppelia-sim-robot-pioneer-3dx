@@ -14,6 +14,11 @@ import time
 # import numpy as np
 import sim
 
+# global variable ----------------------------------------------------------
+
+ROBOT_MAX_SPEED = 5.0
+MIN_SPACE_THRESHOLD = 0.1
+
 # --------------------------------------------------------------------------
 
 def getRobotHandles(clientID):
@@ -95,10 +100,20 @@ def getImageBlob(clientID, hRobot):
 # --------------------------------------------------------------------------
 
 def avoid(sonar):
-	if (sonar[3] < 0.5) or (sonar[4] < 0.5):
-		lspeed, rspeed = +0.3, -0.5    
-	else:
-		lspeed, rspeed = +2.0, +2.0
+	# decrease the speed by distance
+	lspeed = +ROBOT_MAX_SPEED * (sonar[4] - MIN_SPACE_THRESHOLD) 
+	rspeed = +ROBOT_MAX_SPEED * (sonar[3] - MIN_SPACE_THRESHOLD)
+	# gyro by left and right distances
+	lspeed = lspeed + 2.0 - sonar[7] - sonar[15]
+	rspeed = rspeed + 2.0 - sonar[0] - sonar[8] 
+	# when blocked
+	if (sonar[3] < MIN_SPACE_THRESHOLD * 3 or sonar[4] < MIN_SPACE_THRESHOLD * 3):
+		right = sonar[0] + sonar[1] + sonar[2] + sonar[3]
+		left = sonar[4] + sonar[5] + sonar[6] + sonar[7]
+		if (right < left):
+			return lspeed, rspeed * -1
+		elif (right > left):
+			return lspeed * -1, rspeed
 	return lspeed, rspeed
 
 # --------------------------------------------------------------------------
@@ -127,32 +142,9 @@ def main():
             # print '### s', sonar
 
             blobs, coord = getImageBlob(clientID, hRobot)
-            print('###  ', blobs, coord)
-            
-            nspeed = 1.25           
-
-            if blobs == 1:
-                if coord[0] > 0.5:
-                    pd = abs(0.5 - coord[0])/0.5
-                    pi = 0                    
-                else:
-                    pi = (0.5 - coord[0])/0.5
-                    pd = 0
-
-                if coord[1] >= 0.6:
-                    res = 0.5
-                else:
-                    res = 0
-                    
-                print ('pd= ',pd,'pi= ',pi,'Y= ',coord[1])
-                lspeed, rspeed = nspeed+(1.5*pd)- res, nspeed+(1.5*pi)-res
-               
-            else:
-                lspeed, rspeed = avoid(sonar)
-                #lspeed, rspeed = +1.5,+0
 
             # Planning
-            #lspeed, rspeed = avoid(sonar)
+            lspeed, rspeed = avoid(sonar)
 
             # Action
             setSpeed(clientID, hRobot, lspeed, rspeed)
