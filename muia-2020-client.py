@@ -96,14 +96,21 @@ def getImageBlob(clientID, hRobot):
 # --------------------------------------------------------------------------
 
 def avoid(sonar):
-    if (sonar[3] < 0.3) or (sonar[4] < 0.3):
-        return -0.3, +1
-    elif (sonar[6] <  0.3) or (sonar[7] <  0.3):
-        return +1.8, -0.5
-    elif (sonar[3] < 0.6) or (sonar[4] < 0.6):
-        return -0.3, +1
-    elif (sonar[6] <  0.6) or (sonar[7] <  0.6):
-        return +1.8, -0.5
+    if (sonar[3] < 0.5) or (sonar[4] < 0.5):
+        lspeed, rspeed = +0.3, -0.5    
+    else:
+        lspeed, rspeed = +2.0, +2.0
+
+    return lspeed, rspeed
+    
+
+def avoid(sonar):
+    if (sonar[3] < 0.5) or (sonar[4] < 0.5):
+        lspeed, rspeed = +2.0, -0.5
+    elif sonar[1] < 0.5:
+        lspeed, rspeed = +1.0, +0.3
+    elif sonar[5] < 0.5:
+        lspeed, rspeed = +0.2, +0.7
     else:
         return +2.0, +2.0
 # --------------------------------------------------------------------------
@@ -139,14 +146,34 @@ def main():
         while sim.simxGetConnectionId(clientID) != -1:
             # Perception
             sonar = getSonar(clientID, hRobot)
-            '### s', sonar
+            #print ('### s', sonar)
 
             blobs, coord = getImageBlob(clientID, hRobot)
-            print('###  ', blobs, coord)
+
+            nspeed = 1.25           
+
+            if blobs == 1:
+                if coord[0] > 0.5:
+                    pd = abs(0.5 - coord[0])/0.5
+                    pi = 0                    
+                else:
+                    pi = (0.5 - coord[0])/0.5
+                    pd = 0
+
+                if coord[1] >= 0.6:
+                    res = 0.5
+                else:
+                    res = 0
+                    
+                print ('pd= ',pd,'pi= ',pi,'Y= ',coord[1])
+                lspeed, rspeed = nspeed+(1.5*pd)- res, nspeed+(1.5*pi)-res
+               
+            else:
+                lspeed, rspeed = avoid(sonar)
+                #lspeed, rspeed = +1.5,+0
 
             # Planning
-            lspeed, rspeed = avoid(sonar)
-            lspeed, rspeed = track(blobs, coord, lspeed, rspeed)
+            #lspeed, rspeed = avoid(sonar)
 
             # Action
             setSpeed(clientID, hRobot, lspeed, rspeed)
