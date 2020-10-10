@@ -144,7 +144,9 @@ def main():
 
             blobs, coord = getImageBlob(clientID, hRobot)
 
-            nspeed = 1.25           
+            nspeed = 3.8
+            res = 0
+            raz = 2
 
             if blobs == 1:
                 if coord[0] > 0.5:
@@ -153,14 +155,17 @@ def main():
                 else:
                     pi = (0.5 - coord[0])/0.5
                     pd = 0
-
-                if coord[1] >= 0.6:
-                    res = 0.5
-                else:
-                    res = 0
+                
+                if coord[1] <= 0.70:
+                    res = 3.3*coord[1]
                     
-                print ('pd= ',pd,'pi= ',pi,'Y= ',coord[1])
-                lspeed, rspeed = nspeed+(1.5*pd)- res, nspeed+(1.5*pi)-res
+                else:
+                    res = 3.95*coord[1]
+              
+                
+                lspeed, rspeed = nspeed + (raz*pd) - res, nspeed + (raz*pi) - res
+
+                print ('l = ', lspeed, 'r = ', rspeed)
                
             else:
                 lspeed, rspeed = avoid(sonar)
