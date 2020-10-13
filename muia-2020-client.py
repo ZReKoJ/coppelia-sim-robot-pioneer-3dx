@@ -15,6 +15,9 @@ import time
 import sim
 
 # --------------------------------------------------------------------------
+#Requiere: pip install simple-pid
+from simple_pid import PID
+
 
 def getRobotHandles(clientID):
     # Motor handles
@@ -94,20 +97,11 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar):
-    if (sonar[3] < 0.5) or (sonar[4] < 0.5):
-        lspeed, rspeed = +0.3, -0.5    
-    else:
-        lspeed, rspeed = +2.0, +2.0
 
-    return lspeed, rspeed
-
-
-    
 
 def avoid(sonar):
     if (sonar[3] < 0.5) or (sonar[4] < 0.5):
-        lspeed, rspeed = +2.0, -0.5
+        lspeed, rspeed = +3.0, -0.5
     elif sonar[1] < 0.5:
         lspeed, rspeed = +1.0, +0.3
     elif sonar[5] < 0.5:
@@ -116,6 +110,28 @@ def avoid(sonar):
         lspeed, rspeed = +2.0, +2.0
 
     return lspeed, rspeed
+
+# Implementación PID
+# Se implemento un PD
+
+kp = 200
+ki = 0
+kd = 10
+sp = 0.5
+st = 0.01
+o_min = 1
+o_max = 100
+
+pid = PID(kp,ki,kd,setpoint=sp)
+pid.output_limits = (o_min, o_max)
+pid.proportional_on_measurement = True
+#pid.sample_time = st
+
+pid2 = PID(kp,ki,kd,setpoint=sp)
+pid2.output_limits = (o_min, o_max)
+pid2.proportional_on_measurement = True
+#pid2.sample_time = st
+
 
 # --------------------------------------------------------------------------
 
@@ -144,32 +160,54 @@ def main():
 
             blobs, coord = getImageBlob(clientID, hRobot)
 
-            nspeed = 3.8
+            nspeed = 1.66
+            #nspeed = 3.8
             res = 0
             raz = 2
 
             if blobs == 1:
                 if coord[0] > 0.5:
-                    pd = abs(0.5 - coord[0])/0.5
-                    pi = 0                    
-                else:
-                    pi = (0.5 - coord[0])/0.5
-                    pd = 0
-                
-                if coord[1] <= 0.70:
-                    res = 3.3*coord[1]
+                    #pd = abs(0.5 - coord[0])/0.5
+                    pd = abs(0.5 - coord[0])
+                    pi = 0.5
                     
                 else:
-                    res = 3.95*coord[1]
-              
-                
-                lspeed, rspeed = nspeed + (raz*pd) - res, nspeed + (raz*pi) - res
+                    pi = (0.5 - coord[0])
+                    pd = 0.5
 
-                print ('l = ', lspeed, 'r = ', rspeed)
+                
+                if coord[1] <= 0.70:
+                    res = 0                    
+                else:
+                    res = 0.2*coord[1]
+                    
+
+                output = pid(pd)
+                output2 = pid2(pi)
+                               
+                #lspeed, rspeed = nspeed + (raz*pd) - res, nspeed + (raz*pi) - res
+
+                #print ('l = ', lspeed, 'r = ', rspeed)
+
+                if output2 > 1:
+                    lspeed = nspeed*(output2/100) 
+                else:
+                    lspeed = nspeed 
+                #lspeed = nspeed
+
+                if output > 1:
+                    rspeed = nspeed*(output/100)
+                else:
+                    rspeed = nspeed 
+                #rspeed = nspeed
+
+                
+                    
+                print (output2,output)
                
             else:
                 lspeed, rspeed = avoid(sonar)
-                #lspeed, rspeed = +1.5,+0
+                #lspeed, rspeed = 2*nspeed, 0
 
             # Planning
             #lspeed, rspeed = avoid(sonar)
