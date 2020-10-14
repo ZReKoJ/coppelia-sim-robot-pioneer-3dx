@@ -95,7 +95,7 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
+def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.05):
 	# decrease the speed by distance
 	lspeed = +ROBOT_MAX_SPEED * (sonar[4] - MIN_SPACE_THRESHOLD) 
 	rspeed = +ROBOT_MAX_SPEED * (sonar[3] - MIN_SPACE_THRESHOLD)
@@ -114,7 +114,7 @@ def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
     
 # --------------------------------------------------------------------------
 
-def track(blobs, coord, nspeed = 3.8,    res = 0,  raz = 2):
+def track(blobs, coord, nspeed = 3.8, res = 0,  raz = 2):
     if blobs == 1:
         if coord[0] > 0.5:
             pd = abs(0.5 - coord[0])/0.5
@@ -134,7 +134,7 @@ def track(blobs, coord, nspeed = 3.8,    res = 0,  raz = 2):
 
 # --------------------------------------------------------------------------
 
-def explore(sonar, blobs, coord, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
+def explore(sonar, mem, nspeed = 1.8):
     if (mem["blobs"] == 1):
         if mem["coord"][0] > 0.5:
             pd = abs(0.5 - mem["coord"][0])/0.5
@@ -150,15 +150,17 @@ def explore(sonar, blobs, coord, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD
             
         print ('pd= ',pd,'pi= ',pi,'Y= ',mem["coord"][1])
         return nspeed+(1.5*pd)- res, nspeed+(1.5*pi)-res
+    elif(mem["lspeed"]):
+        return mem["lspeed"], mem["rspeed"]
     else:
-        	# decrease the speed by distance
-        lspeed = +ROBOT_MAX_SPEED * (sonar[4] - MIN_SPACE_THRESHOLD) 
-        rspeed = +ROBOT_MAX_SPEED * (sonar[3] - MIN_SPACE_THRESHOLD)
-        # gyro by left and right distances
-        lspeed = lspeed + 2.0 - sonar[7] - sonar[15]
-        rspeed = rspeed + 2.0 - sonar[0] - sonar[8]
-        return lspeed, rspeed
-
+        right = sonar[0] + sonar[1] + sonar[2] + sonar[3]
+        left = sonar[4] + sonar[5] + sonar[6] + sonar[7]
+        if (right > left):
+            return .8, .5
+        elif(right < left):
+            return .5, .8
+        else:
+            return .8, .8
 # --------------------------------------------------------------------------
 
 def coordinator(track_value, avoid_value, explore_value):
@@ -166,6 +168,8 @@ def coordinator(track_value, avoid_value, explore_value):
         return avoid_value
     if (track_value):
         return track_value
+    if (explore_value):
+        return explore_value
 
 # --------------------------------------------------------------------------
 
@@ -191,7 +195,9 @@ def main():
         mem = {
             "sonar": [],
             "blobs": 0,
-            "coord": []
+            "coord": [],
+            "lspeed": 0, 
+            "rspeed": 0
         }
 
         while sim.simxGetConnectionId(clientID) != -1:
@@ -202,17 +208,18 @@ def main():
             # Planning
             avoid_value = avoid(sonar)
             track_value = track(blobs, coord)                 
-            explore_value = explore(sonar, blobs, coord, mem)
+            explore_value = explore(sonar, mem)
 
             lspeed, rspeed = coordinator(track_value, avoid_value, explore_value)
 
             # Action
-            if(mem["blobs"] == 1):
-                mem = {
+            mem = {
                 "sonar": sonar,
                 "blobs": blobs,
-                "coord": coord
-                }
+                "coord": coord,
+                "lspeed":lspeed, 
+                "rspeed": rspeed
+            }
             setSpeed(clientID, hRobot, lspeed, rspeed)
             time.sleep(0.01)
 
