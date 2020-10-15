@@ -95,7 +95,7 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.05):
+def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
 	# decrease the speed by distance
 	lspeed = +ROBOT_MAX_SPEED * (sonar[4] - MIN_SPACE_THRESHOLD) 
 	rspeed = +ROBOT_MAX_SPEED * (sonar[3] - MIN_SPACE_THRESHOLD)
@@ -134,42 +134,43 @@ def track(blobs, coord, nspeed = 3.8, res = 0,  raz = 2):
 
 # --------------------------------------------------------------------------
 
-def explore(sonar, mem, nspeed = 1.8):
-    if (mem["blobs"] == 1):
-        if mem["coord"][0] > 0.5:
-            pd = abs(0.5 - mem["coord"][0])/0.5
-            pi = 0                    
-        else:
-            pi = (0.5 - mem["coord"][0])/0.5
-            pd = 0
-
-        if mem["coord"][1] >= 0.6:
-            res = 0.5
-        else:
-            res = 0
-            
-        print ('pd= ',pd,'pi= ',pi,'Y= ',mem["coord"][1])
-        return nspeed+(1.5*pd)- res, nspeed+(1.5*pi)-res
-    elif(mem["lspeed"]):
-        return mem["lspeed"], mem["rspeed"]
+def attention(sonar, TRESHHOLD = 1.5):
+    right = sonar[0] + sonar[1]
+    left = sonar[6] + sonar[7]
+    if(right > TRESHHOLD):
+        return 1, .5 
+    elif(left > TRESHHOLD):
+        return .5, 1
     else:
-        right = sonar[0] + sonar[1] + sonar[2] + sonar[3]
-        left = sonar[4] + sonar[5] + sonar[6] + sonar[7]
-        if (right > left):
-            return .8, .5
-        elif(right < left):
-            return .5, .8
-        else:
-            return .8, .8
+        return None 
+
+def wander(sonar):
+    right = sonar[15] + sonar[0] + sonar[1] + sonar[2] + sonar[3] 
+    left = sonar[5] + sonar[6] + sonar[7] + sonar[8] + sonar[9]
+    if(right > left):
+        return .5, 1
+    elif(left > right):
+        return 1, .5 
+    else:
+        return 1, 1
+
+def explore(sonar, mem):
+    if (mem["blobs"] == 1):
+        return track(mem["blobs"], mem["coord"])
+    else:
+        attention_value = attention(sonar)
+        if(attention_value):
+            return attention_value
+        return wander(sonar)
+
 # --------------------------------------------------------------------------
 
 def coordinator(track_value, avoid_value, explore_value):
     if (avoid_value):
         return avoid_value
-    if (track_value):
+    elif (track_value):
         return track_value
-    if (explore_value):
-        return explore_value
+    return explore_value
 
 # --------------------------------------------------------------------------
 
@@ -194,8 +195,8 @@ def main():
         #Memory
         mem = {
             "sonar": [],
-            "blobs": 0,
             "coord": [],
+            "blobs": 0,
             "lspeed": 0, 
             "rspeed": 0
         }
