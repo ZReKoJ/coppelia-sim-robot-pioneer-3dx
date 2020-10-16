@@ -134,34 +134,18 @@ def track(blobs, coord, nspeed = 3.8, res = 0,  raz = 2):
 
 # --------------------------------------------------------------------------
 
-def attention(sonar, TRESHHOLD = 1.5):
-    right = sonar[0] + sonar[1]
-    left = sonar[6] + sonar[7]
-    if(right > TRESHHOLD):
-        return 1, .5 
-    elif(left > TRESHHOLD):
-        return .5, 1
-    else:
-        return None 
-
-def wander(sonar):
-    right = sonar[15] + sonar[0] + sonar[1] + sonar[2] + sonar[3] 
-    left = sonar[5] + sonar[6] + sonar[7] + sonar[8] + sonar[9]
-    if(right > left):
-        return .5, 1
-    elif(left > right):
-        return 1, .5 
-    else:
-        return 1, 1
-
 def explore(sonar, mem):
     if (mem["blobs"] == 1):
         return track(mem["blobs"], mem["coord"])
     else:
-        attention_value = attention(sonar)
-        if(attention_value):
-            return attention_value
-        return wander(sonar)
+        right = sonar[15] + sonar[0] + sonar[1] + sonar[2] + sonar[3] 
+        left = sonar[5] + sonar[6] + sonar[7] + sonar[8] + sonar[9]
+        if(right > left):
+            return 1, .5 
+        elif(left > right):
+            return .5, 1
+        else:
+            return 1, 1
 
 # --------------------------------------------------------------------------
 
@@ -222,7 +206,7 @@ def main():
                 "rspeed": rspeed
             }
             setSpeed(clientID, hRobot, lspeed, rspeed)
-            time.sleep(0.01)
+            time.sleep(0.001)
 
         print('### Finishing...')
         sim.simxFinish(clientID)
