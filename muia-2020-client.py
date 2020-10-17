@@ -14,12 +14,47 @@ import time
 # import numpy as np
 import sim
 
-# --------------------------------------------------------------------------
-#Requiere: pip install simple-pid
+# Requiere: pip install simple-pid
 from simple_pid import PID
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+
+# --------------------------------------------------------------------------
+
+# Implementación PID
+# Se implemento un PD
+
+g1 = []
+g2 = []
+g3 = []
+g4 = []
+g5 = []
+g6 = []
+
+kp = 220
+ki = 0
+kd = 20
+
+PID_I = PID(kp,ki,kd)
+PID_I.setpoint = 0.5
+PID_I.output_limits = (0, 100)
+PID_I.proportional_on_measurement = True
+PID_I.sample_time = 0.01
+
+PID_D = PID(kp,ki,kd)
+PID_D.setpoint = 0.5
+PID_D.output_limits = (-100, 0)
+PID_D.proportional_on_measurement = True
+PID_D.sample_time = 0.01
+
+PID_Dist = PID(kp,ki,kd)
+PID_Dist.setpoint = 0.6
+PID_Dist.output_limits = (0, 100)
+PID_Dist.proportional_on_measurement = True
+PID_Dist.sample_time = 0.01
+
+# --------------------------------------------------------------------------
 
 def getRobotHandles(clientID):
     # Motor handles
@@ -86,6 +121,7 @@ def getSonar(clientID, hRobot):
 def getImageBlob(clientID, hRobot):
     rc,ds,pk = sim.simxReadVisionSensor(clientID, hRobot[2],
                                          sim.simx_opmode_buffer)
+                                         
     blobs = 0
     coord = []
     if rc == sim.simx_return_ok and pk[1][0]:
@@ -99,52 +135,74 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
+def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
+	if (True in (s < MIN_SPACE_THRESHOLD for s in sonar[1:7])):
+		lspeed = sonar[4] + sonar[5] + sonar[6] + sonar[7]
+		rspeed = sonar[0] + sonar[1] + sonar[2] + sonar[3] 
+		lspeed = lspeed * ROBOT_MAX_SPEED / 4.0
+		rspeed = rspeed * ROBOT_MAX_SPEED / 4.0
+		if lspeed > rspeed:
+			return lspeed, -lspeed
+		else:
+			return -rspeed, rspeed
+	return None
+    
+# --------------------------------------------------------------------------
 
+def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
+    if blobs == 1:
+    	if coord[0] >= 0.5:
+    		pos_d = 1 - coord[0]
+    		pos_i = 0.5
+    	else:
+    		pos_d = 0.5
+    		pos_i = coord[0]
+    		
+    	res_MD = PID_I(pos_i)
+    	res_MI = PID_D(pos_d)
+    	res_Dist = PID_Dist(sonar[3])
+    	
+    	pwm_I = (100 + res_MI) / 100
+    	pwm_D = res_MD / 100
 
-def avoid(sonar):
-    if (sonar[3] < 0.5) or (sonar[4] < 0.5):
-        lspeed, rspeed = +3.0, -0.5
-    elif sonar[1] < 0.5:
-        lspeed, rspeed = +1.0, +0.3
-    elif sonar[5] < 0.5:
-        lspeed, rspeed = +0.2, +0.7
+    	breake = 0
+    	if sonar[3] < 0.4 and coord[1] >= 0.7:
+            breake = -4*res_Dist / 100
+    	
+    	lspeed = ROBOT_MAX_SPEED + fact * pwm_D + breake
+    	rspeed = ROBOT_MAX_SPEED + fact * pwm_I + 1.2*breake
+    	
+    	return lspeed, rspeed
+    return None
+
+# --------------------------------------------------------------------------
+
+def explore(sonar, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
+    if (mem["blobs"] == 1 and False):
+        return track(mem["blobs"], mem["coord"])
     else:
-        lspeed, rspeed = +3.0, +3.0
+    	aug_avoid_value = avoid(sonar, ROBOT_MAX_SPEED=ROBOT_MAX_SPEED, MIN_SPACE_THRESHOLD=MIN_SPACE_THRESHOLD)
+    	if(aug_avoid_value):
+    		return aug_avoid_value
+    	right = (sonar[0] + sonar[1] + sonar[2] + sonar[3]) * ROBOT_MAX_SPEED / 3.0
+    	left = (sonar[4] + sonar[5] + sonar[6] + sonar[7]) * ROBOT_MAX_SPEED / 3.0
+    	if(right > left):
+    		return left* .5, right
+    	elif(left > right):
+    		return left, right * .5
+    	return 2, 2
 
-    return lspeed, rspeed
+# --------------------------------------------------------------------------
 
-# Implementación PID
-# Se implemento un PD
-
-g1 = []
-g2 = []
-g3 = []
-g4 = []
-g5 = []
-g6 = []
-
-kp = 220
-ki = 0
-kd = 20
-
-PID_I = PID(kp,ki,kd)
-PID_I.setpoint = 0.5
-PID_I.output_limits = (0, 100)
-PID_I.proportional_on_measurement = True
-PID_I.sample_time = 0.01
-
-PID_D = PID(kp,ki,kd)
-PID_D.setpoint = 0.5
-PID_D.output_limits = (-100, 0)
-PID_D.proportional_on_measurement = True
-PID_D.sample_time = 0.01
-
-
-PID_Dist = PID(kp,ki,kd)
-PID_Dist.setpoint = 0.68
-PID_Dist.output_limits = (0, 100)
-PID_Dist.proportional_on_measurement = True
-PID_Dist.sample_time = 0.01
+def coordinator(track_value, avoid_value, explore_value):
+    if (avoid_value):
+    	print("avoid", avoid_value)
+    	return avoid_value
+    elif (track_value):
+    	print("track", track_value)
+    	return track_value
+    print("explore", explore_value)
+    return explore_value
 
 # --------------------------------------------------------------------------
 
@@ -159,85 +217,45 @@ def main():
     port = int(sys.argv[1])
     clientID = sim.simxStart('127.0.0.1', port, True, True, 2000, 5)
 
-    
     if clientID == -1:
         print('### Failed connecting to remote API server')
 
     else:
         print('### Connected to remote API server')
-        hRobot = getRobotHandles(clientID)       
+        hRobot = getRobotHandles(clientID)
+        
+        #Memory
+        mem = {
+            "sonar": [],
+            "coord": [],
+            "blobs": 0,
+            "lspeed": 0, 
+            "rspeed": 0
+        }
 
         while sim.simxGetConnectionId(clientID) != -1:
             # Perception
             sonar = getSonar(clientID, hRobot)
-            #print ('### s', sonar)
-
             blobs, coord = getImageBlob(clientID, hRobot)
 
-
-            if blobs == 1:
-                
-
-                if coord[0] >= 0.5:
-                    pos_d = 1 - coord[0]
-                    pos_i = 0.5
-                else:
-                    pos_d = 0.5
-                    pos_i = coord[0]
-
-                
-                res_MD = PID_I(pos_i)
-                res_MI = PID_D(pos_d)
-                res_Dist = PID_Dist(coord[1])
-                
-
-                speed_p = 1.75
-                fact = -3            
-                pwm_I = (100+res_MI)/100
-                pwm_D = res_MD/100
-
-                breake = res_Dist/100
-                                
-                lspeed = speed_p + fact*pwm_D + breake
-                rspeed = speed_p + fact*pwm_I + breake
-               
-                #lspeed = 0
-                #rspeed = 0
-
-
-                g1.append(pos_d)
-                g2.append(pos_i)
-                g3.append(pwm_I)
-                g4.append(pwm_D)
-                
-                g5.append(coord[1])
-                g6.append(res_Dist/100)
-                
-
-                plt.figure(1)                
-                #plt.plot(g1)
-                #plt.plot(g2)
-                #plt.plot(g3)
-                #plt.plot(g4)
-                plt.plot(g5)
-                plt.plot(g6)
-                plt.pause(0.0005)
-                plt.cla()
-                
-               
-               
-            else:
-                lspeed, rspeed = avoid(sonar)
-                #lspeed, rspeed = 2*nspeed, 0
-
             # Planning
-            #lspeed, rspeed = avoid(sonar)
+            avoid_value = avoid(sonar)
+            track_value = track(blobs, coord, sonar)                 
+            explore_value = explore(sonar, mem)
+
+            lspeed, rspeed = coordinator(track_value, avoid_value, explore_value)
 
             # Action
+            mem = {
+                "sonar": sonar,
+                "blobs": blobs,
+                "coord": coord,
+                "lspeed":lspeed, 
+                "rspeed": rspeed
+            }
+            
             setSpeed(clientID, hRobot, lspeed, rspeed)
-            #time.sleep(0.1)
-
-           
+            time.sleep(0.001)
 
         print('### Finishing...')
         sim.simxFinish(clientID)
