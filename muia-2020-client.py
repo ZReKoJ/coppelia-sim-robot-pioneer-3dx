@@ -95,21 +95,16 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
-	# decrease the speed by distance
-	lspeed = +ROBOT_MAX_SPEED * (sonar[4] - MIN_SPACE_THRESHOLD) 
-	rspeed = +ROBOT_MAX_SPEED * (sonar[3] - MIN_SPACE_THRESHOLD)
-	# gyro by left and right distances
-	lspeed = lspeed + 2.0 - sonar[7] - sonar[15]
-	rspeed = rspeed + 2.0 - sonar[0] - sonar[8] 
-	# when blocked
-	if (sonar[3] < MIN_SPACE_THRESHOLD * 3 or sonar[4] < MIN_SPACE_THRESHOLD * 3):
-		right = sonar[0] + sonar[1] + sonar[2] + sonar[3]
-		left = sonar[4] + sonar[5] + sonar[6] + sonar[7]
-		if (right < left):
-			return lspeed, rspeed * -1
-		elif (right > left):
-			return lspeed * -1, rspeed
+def avoid(sonar, ROBOT_MAX_SPEED = 3.0, MIN_SPACE_THRESHOLD = 0.1):
+	if (True in (s < MIN_SPACE_THRESHOLD for s in sonar[1:7])):
+		lspeed = sonar[4] + sonar[5] + sonar[6] #+ sonar[7] + sonar[8] + sonar[9] + sonar[10] + sonar[11]
+		rspeed = sonar[0] + sonar[1] + sonar[2] #+ sonar[3] + sonar[12] + sonar[13] + sonar[14] + sonar[15]
+		lspeed = lspeed * ROBOT_MAX_SPEED / 3.0
+		rspeed = lspeed * ROBOT_MAX_SPEED / 3.0
+		if lspeed > rspeed:
+			return lspeed, -rspeed
+		else:
+			return -lspeed, rspeed
 	return None
     
 # --------------------------------------------------------------------------
@@ -134,26 +129,31 @@ def track(blobs, coord, nspeed = 3.8, res = 0,  raz = 2):
 
 # --------------------------------------------------------------------------
 
-def explore(sonar, mem):
+def explore(sonar, mem, ROBOT_MAX_SPEED = 3.0, MIN_SPACE_THRESHOLD=.25):
     if (mem["blobs"] == 1):
         return track(mem["blobs"], mem["coord"])
     else:
-        right = sonar[15] + sonar[0] + sonar[1] + sonar[2] + sonar[3] 
-        left = sonar[5] + sonar[6] + sonar[7] + sonar[8] + sonar[9]
+        aug_avoid_value = avoid(sonar, ROBOT_MAX_SPEED=ROBOT_MAX_SPEED, MIN_SPACE_THRESHOLD=MIN_SPACE_THRESHOLD)
+        if(aug_avoid_value):
+            return aug_avoid_value
+        right = (sonar[0] + sonar[1] + sonar[2]) * ROBOT_MAX_SPEED / 3.0
+        left = (sonar[4] + sonar[5] + sonar[6])* ROBOT_MAX_SPEED / 3.0
         if(right > left):
-            return 1, .5 
+            return left* .5, right  
         elif(left > right):
-            return .5, 1
-        else:
-            return 1, 1
+            return left, right * .5
+        return 2, 2
 
 # --------------------------------------------------------------------------
 
 def coordinator(track_value, avoid_value, explore_value):
     if (avoid_value):
-        return avoid_value
+    	print("avoid", avoid_value)
+    	return avoid_value
     elif (track_value):
-        return track_value
+    	print("track", track_value)
+    	return track_value
+    print("explore", explore_value)
     return explore_value
 
 # --------------------------------------------------------------------------
