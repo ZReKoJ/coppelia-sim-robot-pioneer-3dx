@@ -14,6 +14,46 @@ import time
 # import numpy as np
 import sim
 
+# Requiere: pip install simple-pid
+from simple_pid import PID
+
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+# --------------------------------------------------------------------------
+
+# Implementación PID
+# Se implemento un PD
+
+g1 = []
+g2 = []
+g3 = []
+g4 = []
+g5 = []
+g6 = []
+
+kp = 220
+ki = 0
+kd = 20
+
+PID_I = PID(kp,ki,kd)
+PID_I.setpoint = 0.5
+PID_I.output_limits = (0, 100)
+PID_I.proportional_on_measurement = True
+PID_I.sample_time = 0.01
+
+PID_D = PID(kp,ki,kd)
+PID_D.setpoint = 0.5
+PID_D.output_limits = (-100, 0)
+PID_D.proportional_on_measurement = True
+PID_D.sample_time = 0.01
+
+PID_Dist = PID(kp,ki,kd)
+PID_Dist.setpoint = 0.68
+PID_Dist.output_limits = (0, 100)
+PID_Dist.proportional_on_measurement = True
+PID_Dist.sample_time = 0.01
+
 # --------------------------------------------------------------------------
 
 def getRobotHandles(clientID):
@@ -102,44 +142,53 @@ def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
 		lspeed = lspeed * ROBOT_MAX_SPEED / 4.0
 		rspeed = rspeed * ROBOT_MAX_SPEED / 4.0
 		if lspeed > rspeed:
-			return lspeed, -rspeed
+			return lspeed, -lspeed
 		else:
-			return -lspeed, rspeed
+			return -rspeed, rspeed
 	return None
     
 # --------------------------------------------------------------------------
 
-def track(blobs, coord, nspeed = 3.8, res = 0,  raz = 2):
+def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
     if blobs == 1:
-        if coord[0] > 0.5:
-            pd = abs(0.5 - coord[0])/0.5
-            pi = 0                    
-        else:
-            pi = (0.5 - coord[0])/0.5
-            pd = 0
-
-        if coord[1] <= 0.70:
-            res = 3.3*coord[1]
-        else:
-            res = 3.95*coord[1]
-            
-        #print ('pd= ',pd,'pi= ',pi,'Y= ',coord[1])
-        return nspeed + (raz*pd) - res, nspeed + (raz*pi) - res
+    	if coord[0] >= 0.5:
+    		pos_d = 1 - coord[0]
+    		pos_i = 0.5
+    	else:
+    		pos_d = 0.5
+    		pos_i = coord[0]
+    		
+    	res_MD = PID_I(pos_i)
+    	res_MI = PID_D(pos_d)
+    	res_Dist = PID_Dist(coord[1])
+    	
+    	pwm_I = (100 + res_MI) / 100
+    	pwm_D = res_MD / 100
+    	
+    	breake = res_Dist / 100
+    	
+    	lspeed = ROBOT_MAX_SPEED + fact * pwm_D + breake
+    	rspeed = ROBOT_MAX_SPEED + fact * pwm_I + breake
+    	
+    	return lspeed, rspeed
     return None
 
 # --------------------------------------------------------------------------
 
-def explore(sonar, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
+def explore(sonar, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
     if (mem["blobs"] == 1 and False):
         return track(mem["blobs"], mem["coord"])
     else:
-    	# decrease the speed by distance
-        lspeed = +ROBOT_MAX_SPEED * sonar[4] 
-        rspeed = +ROBOT_MAX_SPEED * sonar[3]
-        # gyro by left and right distances
-        lspeed = lspeed + 2.0 - sonar[7] - sonar[15]
-        rspeed = rspeed + 2.0 - sonar[0] - sonar[8]
-        return lspeed, rspeed
+    	aug_avoid_value = avoid(sonar, ROBOT_MAX_SPEED=ROBOT_MAX_SPEED, MIN_SPACE_THRESHOLD=MIN_SPACE_THRESHOLD)
+    	if(aug_avoid_value):
+    		return aug_avoid_value
+    	right = (sonar[0] + sonar[1] + sonar[2] + sonar[3]) * ROBOT_MAX_SPEED / 3.0
+    	left = (sonar[4] + sonar[5] + sonar[6] + sonar[7]) * ROBOT_MAX_SPEED / 3.0
+    	if(right > left):
+    		return left* .5, right
+    	elif(left > right):
+    		return left, right * .5
+    	return 2, 2
 
 # --------------------------------------------------------------------------
 
@@ -189,7 +238,7 @@ def main():
 
             # Planning
             avoid_value = avoid(sonar)
-            track_value = track(blobs, coord)                 
+            track_value = track(blobs, coord, sonar)                 
             explore_value = explore(sonar, mem)
 
             lspeed, rspeed = coordinator(track_value, avoid_value, explore_value)
