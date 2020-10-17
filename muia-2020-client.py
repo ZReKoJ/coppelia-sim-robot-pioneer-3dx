@@ -18,6 +18,8 @@ import sim
 #Requiere: pip install simple-pid
 from simple_pid import PID
 
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 def getRobotHandles(clientID):
     # Motor handles
@@ -107,31 +109,42 @@ def avoid(sonar):
     elif sonar[5] < 0.5:
         lspeed, rspeed = +0.2, +0.7
     else:
-        lspeed, rspeed = +2.0, +2.0
+        lspeed, rspeed = +3.0, +3.0
 
     return lspeed, rspeed
 
 # Implementación PID
 # Se implemento un PD
 
-kp = 200
+g1 = []
+g2 = []
+g3 = []
+g4 = []
+g5 = []
+g6 = []
+
+kp = 220
 ki = 0
-kd = 10
-sp = 0.5
-st = 0.01
-o_min = 1
-o_max = 100
+kd = 20
 
-pid = PID(kp,ki,kd,setpoint=sp)
-pid.output_limits = (o_min, o_max)
-pid.proportional_on_measurement = True
-#pid.sample_time = st
+PID_I = PID(kp,ki,kd)
+PID_I.setpoint = 0.5
+PID_I.output_limits = (0, 100)
+PID_I.proportional_on_measurement = True
+PID_I.sample_time = 0.01
 
-pid2 = PID(kp,ki,kd,setpoint=sp)
-pid2.output_limits = (o_min, o_max)
-pid2.proportional_on_measurement = True
-#pid2.sample_time = st
+PID_D = PID(kp,ki,kd)
+PID_D.setpoint = 0.5
+PID_D.output_limits = (-100, 0)
+PID_D.proportional_on_measurement = True
+PID_D.sample_time = 0.01
 
+
+PID_Dist = PID(kp,ki,kd)
+PID_Dist.setpoint = 0.68
+PID_Dist.output_limits = (0, 100)
+PID_Dist.proportional_on_measurement = True
+PID_Dist.sample_time = 0.01
 
 # --------------------------------------------------------------------------
 
@@ -146,12 +159,13 @@ def main():
     port = int(sys.argv[1])
     clientID = sim.simxStart('127.0.0.1', port, True, True, 2000, 5)
 
+    
     if clientID == -1:
         print('### Failed connecting to remote API server')
 
     else:
         print('### Connected to remote API server')
-        hRobot = getRobotHandles(clientID)
+        hRobot = getRobotHandles(clientID)       
 
         while sim.simxGetConnectionId(clientID) != -1:
             # Perception
@@ -160,50 +174,57 @@ def main():
 
             blobs, coord = getImageBlob(clientID, hRobot)
 
-            nspeed = 1.66
-            #nspeed = 3.8
-            res = 0
-            raz = 2
 
             if blobs == 1:
-                if coord[0] > 0.5:
-                    #pd = abs(0.5 - coord[0])/0.5
-                    pd = abs(0.5 - coord[0])
-                    pi = 0.5
-                    
+                
+
+                if coord[0] >= 0.5:
+                    pos_d = 1 - coord[0]
+                    pos_i = 0.5
                 else:
-                    pi = (0.5 - coord[0])
-                    pd = 0.5
+                    pos_d = 0.5
+                    pos_i = coord[0]
 
                 
-                if coord[1] <= 0.70:
-                    res = 0                    
-                else:
-                    res = 0.2*coord[1]
-                    
-
-                output = pid(pd)
-                output2 = pid2(pi)
-                               
-                #lspeed, rspeed = nspeed + (raz*pd) - res, nspeed + (raz*pi) - res
-
-                #print ('l = ', lspeed, 'r = ', rspeed)
-
-                if output2 > 1:
-                    lspeed = nspeed*(output2/100) 
-                else:
-                    lspeed = nspeed 
-                #lspeed = nspeed
-
-                if output > 1:
-                    rspeed = nspeed*(output/100)
-                else:
-                    rspeed = nspeed 
-                #rspeed = nspeed
-
+                res_MD = PID_I(pos_i)
+                res_MI = PID_D(pos_d)
+                res_Dist = PID_Dist(coord[1])
                 
-                    
-                print (output2,output)
+
+                speed_p = 1.75
+                fact = -3            
+                pwm_I = (100+res_MI)/100
+                pwm_D = res_MD/100
+
+                breake = res_Dist/100
+                                
+                lspeed = speed_p + fact*pwm_D + breake
+                rspeed = speed_p + fact*pwm_I + breake
+               
+                #lspeed = 0
+                #rspeed = 0
+
+
+                g1.append(pos_d)
+                g2.append(pos_i)
+                g3.append(pwm_I)
+                g4.append(pwm_D)
+                
+                g5.append(coord[1])
+                g6.append(res_Dist/100)
+                
+
+                plt.figure(1)                
+                #plt.plot(g1)
+                #plt.plot(g2)
+                #plt.plot(g3)
+                #plt.plot(g4)
+                plt.plot(g5)
+                plt.plot(g6)
+                plt.pause(0.0005)
+                plt.cla()
+                
+               
                
             else:
                 lspeed, rspeed = avoid(sonar)
@@ -214,7 +235,9 @@ def main():
 
             # Action
             setSpeed(clientID, hRobot, lspeed, rspeed)
-            time.sleep(0.1)
+            #time.sleep(0.1)
+
+           
 
         print('### Finishing...')
         sim.simxFinish(clientID)
