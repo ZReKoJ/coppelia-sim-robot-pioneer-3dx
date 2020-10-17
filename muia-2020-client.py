@@ -95,12 +95,12 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar, ROBOT_MAX_SPEED = 3.0, MIN_SPACE_THRESHOLD = 0.1):
+def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
 	if (True in (s < MIN_SPACE_THRESHOLD for s in sonar[1:7])):
-		lspeed = sonar[4] + sonar[5] + sonar[6] #+ sonar[7] + sonar[8] + sonar[9] + sonar[10] + sonar[11]
-		rspeed = sonar[0] + sonar[1] + sonar[2] #+ sonar[3] + sonar[12] + sonar[13] + sonar[14] + sonar[15]
-		lspeed = lspeed * ROBOT_MAX_SPEED / 3.0
-		rspeed = lspeed * ROBOT_MAX_SPEED / 3.0
+		lspeed = sonar[4] + sonar[5] + sonar[6] + sonar[7]
+		rspeed = sonar[0] + sonar[1] + sonar[2] + sonar[3] 
+		lspeed = lspeed * ROBOT_MAX_SPEED / 4.0
+		rspeed = rspeed * ROBOT_MAX_SPEED / 4.0
 		if lspeed > rspeed:
 			return lspeed, -rspeed
 		else:
