@@ -49,7 +49,7 @@ PID_D.proportional_on_measurement = True
 PID_D.sample_time = 0.01
 
 PID_Dist = PID(kp,ki,kd)
-PID_Dist.setpoint = 0.68
+PID_Dist.setpoint = 0.6
 PID_Dist.output_limits = (0, 100)
 PID_Dist.proportional_on_measurement = True
 PID_Dist.sample_time = 0.01
@@ -160,12 +160,14 @@ def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
     		
     	res_MD = PID_I(pos_i)
     	res_MI = PID_D(pos_d)
-    	res_Dist = PID_Dist(coord[1])
+    	res_Dist = PID_Dist(sonar[3])
     	
     	pwm_I = (100 + res_MI) / 100
     	pwm_D = res_MD / 100
-    	
-    	breake = res_Dist / 100
+
+    	breake = 0
+    	if sonar[3] < 0.4 and coord[1] >= 0.7:
+            breake = -4 * res_Dist / 100
     	
     	lspeed = ROBOT_MAX_SPEED + fact * pwm_D + breake
     	rspeed = ROBOT_MAX_SPEED + fact * pwm_I + breake
@@ -176,18 +178,18 @@ def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
 # --------------------------------------------------------------------------
 
 def explore(sonar, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
-    if (mem["blobs"] == 1 and False):
-        return track(mem["blobs"], mem["coord"])
+    if mem["blobs"] == 1:
+        return track(mem["blobs"], mem["coord"], sonar)
     else:
     	aug_avoid_value = avoid(sonar, ROBOT_MAX_SPEED=ROBOT_MAX_SPEED, MIN_SPACE_THRESHOLD=MIN_SPACE_THRESHOLD)
     	if(aug_avoid_value):
     		return aug_avoid_value
-    	right = (sonar[0] + sonar[1] + sonar[2] + sonar[3]) * ROBOT_MAX_SPEED / 3.0
-    	left = (sonar[4] + sonar[5] + sonar[6] + sonar[7]) * ROBOT_MAX_SPEED / 3.0
+    	right = (sonar[0] + sonar[1] + sonar[2] + sonar[3]) * ROBOT_MAX_SPEED / 4.0
+    	left = (sonar[4] + sonar[5] + sonar[6] + sonar[7]) * ROBOT_MAX_SPEED / 4.0
     	if(right > left):
-    		return left* .5, right
+    		return left * 0.5, right
     	elif(left > right):
-    		return left, right * .5
+    		return left, right * 0.5
     	return 2, 2
 
 # --------------------------------------------------------------------------
@@ -264,4 +266,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
