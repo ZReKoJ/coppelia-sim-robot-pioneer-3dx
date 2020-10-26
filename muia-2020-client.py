@@ -17,23 +17,13 @@ import sim
 # Requiere: pip install simple-pid
 from simple_pid import PID
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 # --------------------------------------------------------------------------
 
-# Implementación PID
-# Se implemento un PD
-
-g1 = []
-g2 = []
-g3 = []
-g4 = []
-g5 = []
-g6 = []
+# PID
 
 kp = 220
-ki = 0
+ki = 0.005
 kd = 20
 
 PID_I = PID(kp,ki,kd)
@@ -135,7 +125,7 @@ def getImageBlob(clientID, hRobot):
 
 # --------------------------------------------------------------------------
 
-def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
+def avoid(sonar, ROBOT_MAX_SPEED = 1.75, MIN_SPACE_THRESHOLD = 0.1):
 	if (True in (s < MIN_SPACE_THRESHOLD for s in sonar[1:7])):
 		lspeed = sonar[4] + sonar[5] + sonar[6] + sonar[7]
 		rspeed = sonar[0] + sonar[1] + sonar[2] + sonar[3] 
@@ -149,7 +139,8 @@ def avoid(sonar, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.1):
     
 # --------------------------------------------------------------------------
 
-def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
+def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 2, fact = -3):
+    
     if blobs == 1:
     	if coord[0] >= 0.5:
     		pos_d = 1 - coord[0]
@@ -161,25 +152,32 @@ def track(blobs, coord, sonar, ROBOT_MAX_SPEED = 1.75, fact = -3):
     	res_MD = PID_I(pos_i)
     	res_MI = PID_D(pos_d)
     	res_Dist = PID_Dist(sonar[3])
-    	
-    	pwm_I = (100 + res_MI) / 100
-    	pwm_D = res_MD / 100
 
+    	lspeed_B = sonar[8] + sonar[9] + sonar[10] + sonar[11]
+    	rspeed_B = sonar[12] + sonar[13] + sonar[14] + sonar[15]
+    	lspeed_B = lspeed_B * ROBOT_MAX_SPEED /2.5
+    	rspeed_B = rspeed_B * ROBOT_MAX_SPEED /2.5
+    	
+    	a_I = (100 + res_MI) / 100
+    	a_D = res_MD / 100
+
+    	   
     	breake = 0
     	if sonar[3] < 0.4 and coord[1] >= 0.7:
-            breake = -4*res_Dist / 100
-    	
-    	lspeed = ROBOT_MAX_SPEED + fact * pwm_D + breake
-    	rspeed = ROBOT_MAX_SPEED + fact * pwm_I + 1.2*breake
+            breake = -1.8*res_Dist / 100
+
+                 	
+    	lspeed = ROBOT_MAX_SPEED + fact * a_D + lspeed_B*breake
+    	rspeed = ROBOT_MAX_SPEED + fact * a_I + rspeed_B*breake
     	
     	return lspeed, rspeed
     return None
 
 # --------------------------------------------------------------------------
 
-def explore(sonar, mem, ROBOT_MAX_SPEED = 5.0, MIN_SPACE_THRESHOLD = 0.15):
-    if (mem["blobs"] == 1 and False):
-        return track(mem["blobs"], mem["coord"])
+def explore(sonar, mem, ROBOT_MAX_SPEED = 2.5, MIN_SPACE_THRESHOLD = 0.15):
+    if (mem["blobs"] == 1):
+        return track(mem["blobs"], mem["coord"], sonar)
     else:
     	aug_avoid_value = avoid(sonar, ROBOT_MAX_SPEED=ROBOT_MAX_SPEED, MIN_SPACE_THRESHOLD=MIN_SPACE_THRESHOLD)
     	if(aug_avoid_value):
